@@ -1,0 +1,56 @@
+name: Build Switch NRO
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: devkitpro/devkita64:latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Install host build tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends cmake ninja-build python3 make
+
+      - name: Install Switch libraries
+        run: |
+          dkp-pacman -Sy --noconfirm --needed \
+            deko3d \
+            uam \
+            switch-ffmpeg \
+            switch-dav1d \
+            switch-libexpat \
+            switch-libzstd \
+            switch-zlib \
+            switch-bzip2
+
+      - name: Provide libelf placeholder if missing
+        # The Switch build script requires libelf.a, but no game code uses it
+        # and devkitPro does not ship it, so an empty archive satisfies the link.
+        run: |
+          LIBELF="$DEVKITPRO/portlibs/switch/lib/libelf.a"
+          if [ ! -f "$LIBELF" ]; then
+            "$DEVKITPRO/devkitA64/bin/aarch64-none-elf-ar" rcs "$LIBELF"
+          fi
+
+      - name: Configure
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE=cmake/devkitA64-libnx.cmake
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Upload NRO
+        uses: actions/upload-artifact@v4
+        with:
+          name: ProjectCane-switch
+          path: build/ProjectCane.nro
