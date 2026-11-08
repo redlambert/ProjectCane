@@ -174,6 +174,14 @@ void HandleAsegaEvent(ASEGA* pasega, EA* pea, int* pfRetracted)
                     psw, 260, static_cast<OID>(peasnd->oid), paloSearchRoot));
             }
 
+            {
+                char note[96];
+                std::snprintf(note, sizeof(note), "aseg_sound sfx=%d cont=%d paloSound=%s eventOid=%d",
+                    static_cast<int>(sfxid), fContinuous ? 1 : 0,
+                    paloSound ? "found" : "none", static_cast<int>(peasnd->oid));
+                TraceSoundEvent("ASEG_SOUND", nullptr, pasega->paloRoot, note);
+            }
+
             AMB** ppamb = fContinuous ? &pasega->pambContinuous : nullptr;
             if (!paloSound)
                 StartSound(sfxid, ppamb, nullptr, nullptr, 3000.0f, 300.0f, 1.0f, 0.0f, 0.0f, nullptr, nullptr);
@@ -935,8 +943,13 @@ void RetractAsega(ASEGA* pasega)
         pactseg = pactsegNext;
     }
 
+    // Dropping the handle here used to orphan the animation's looping sound.
+    // When that sound is attached to an object that stays in the world (such
+    // as the turret Sly fires from), nothing can ever stop it again, so every
+    // replay of the animation stacked another endless loop. Stop it instead,
+    // with a short fade so the cut is not audible as a pop.
     if (pasega->pambContinuous != nullptr)
-        DropPamb(&pasega->pambContinuous);
+        StopSound(pasega->pambContinuous, 100);
 
     void* apvArgs[1] = { &pasega->paloRoot };
     HandleLoSpliceEvent(static_cast<LO*>(paseg), 11, 1, apvArgs);

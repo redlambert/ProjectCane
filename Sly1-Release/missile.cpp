@@ -127,6 +127,8 @@ void ProjectMissileTransform(MISSILE* pmissile, float dt, int fParentDirty)
 
 void FireMissile(MISSILE* pmissile, ALO* paloTarget, glm::vec3* pposTargetLocal)
 {
+	TraceSoundEvent("MISSILE_FIRE", nullptr, pmissile, nullptr);
+
 	pmissile->paloTarget = paloTarget;
 	pmissile->posTargetLocal = *pposTargetLocal;
 

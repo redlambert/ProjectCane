@@ -3802,6 +3802,109 @@ void ExecuteEffectGrain(AMB& amb)
 	amb.grainCountdown = sound.grains[amb.nextGrain].delay + extraDelay;
 }
 
+// ---------------------------------------------------------------------------
+// Temporary sound trace (diagnostic build)
+//
+// Writes sound_trace.log next to the game's data folder. Logs every looping
+// or repeating sound start, every stop/drop/removal of one, and every sound an
+// animation (ASEG) starts, with the object each one is attached to. Capped at
+// 4 MB so it can be left on safely.
+// ---------------------------------------------------------------------------
+static std::ofstream s_soundTrace;
+static bool s_soundTraceTried = false;
+static std::size_t s_soundTraceBytes = 0;
+static constexpr std::size_t kSoundTraceLimit = 4u * 1024u * 1024u;
+
+static int CambLive()
+{
+	if (g_psw == nullptr)
+		return 0;
+
+	int camb = 0;
+
+	for (const std::unique_ptr<AMB>& slot : g_psw->ambOwners)
+		if (slot)
+			++camb;
+
+	return camb;
+}
+
+static void AppendLoTrace(std::ostringstream& line, const char* label, const LO* plo)
+{
+	line << ' ' << label << '=';
+
+	if (plo == nullptr)
+	{
+		line << "none";
+		return;
+	}
+
+	line << "oid:" << plo->oid;
+
+	if (plo->pvtlo != nullptr)
+		line << ",cid:" << static_cast<int>(plo->pvtlo->cid);
+
+	if (plo->pchzName != nullptr)
+		line << ",name:" << plo->pchzName;
+
+	line << ",inworld:" << (FIsLoInWorld(const_cast<LO*>(plo)) ? 1 : 0);
+}
+
+void TraceSoundEvent(const char* event, const AMB* pamb, const LO* ploContext, const char* note)
+{
+	if (!s_soundTraceTried)
+	{
+		s_soundTraceTried = true;
+
+		std::error_code error;
+		const std::filesystem::path directory = ExecutableDirectory();
+
+		std::filesystem::create_directories(directory, error);
+		s_soundTrace.open(directory / "sound_trace.log", std::ios::trunc);
+
+		if (s_soundTrace.is_open())
+			s_soundTrace << "ProjectCane sound trace\n";
+	}
+
+	if (!s_soundTrace.is_open() || s_soundTraceBytes > kSoundTraceLimit)
+		return;
+
+	std::ostringstream line;
+
+	line << event
+		<< " t=" << std::fixed << std::setprecision(3) << g_clock.t;
+
+	if (pamb != nullptr)
+	{
+		line << " amb=" << pamb->iSerial
+			<< " sfx=" << static_cast<int>(pamb->sfxid)
+			<< " cont=" << pamb->fContinuous
+			<< " repeat=" << (pamb->lmRepeat.gMin >= 0.0f ? 1 : 0)
+			<< " owned=" << (pamb->ppamb != nullptr ? 1 : 0);
+
+		AppendLoTrace(line, "palo", pamb->palo);
+	}
+
+	if (ploContext != nullptr)
+		AppendLoTrace(line, "ctx", ploContext);
+
+	if (note != nullptr)
+		line << " note=" << note;
+
+	line << " live=" << CambLive() << '\n';
+
+	const std::string entry = line.str();
+
+	s_soundTraceBytes += entry.size();
+	s_soundTrace << entry;
+	s_soundTrace.flush();
+}
+
+static bool FTraceAmb(const AMB* pamb)
+{
+	return pamb != nullptr && (pamb->fContinuous || pamb->lmRepeat.gMin >= 0.0f);
+}
+
 void StartSound(SFXID sfxid, AMB** ppamb, ALO* palo, glm::vec3* ppos, float sStart, float sFull, float uVolAtSource, float frq, float uDoppler, LM* plmRepeat, LM* plmRepDist)
 {
 	const int index = static_cast<int>(sfxid);
@@ -3916,6 +4019,8 @@ void StartSound(SFXID sfxid, AMB** ppamb, ALO* palo, glm::vec3* ppos, float sSta
 	amb->nextGrain = 0;
 	amb->grainCountdown = sound.grains[0].delay;
 	amb->handlerDone = recurring || (continuous && outOfRange);
+	if (FTraceAmb(amb))
+		TraceSoundEvent("START", amb, nullptr, nullptr);
 	if (amb->fAttached)
 		SetPambVol(amb, uVolAtSource);
 	if (recurring)
@@ -3966,6 +4071,8 @@ void DropPamb(AMB** ppamb)
 	if (ppamb == nullptr || *ppamb == nullptr)
 		return;
 
+	TraceSoundEvent("DROP", *ppamb, nullptr, nullptr);
+
 	(*ppamb)->ppamb = nullptr;
 	*ppamb = nullptr;
 }
@@ -3974,6 +4081,8 @@ void RemoveAmb(AMB* pamb)
 {
 	if (pamb == nullptr || g_psw == nullptr)
 		return;
+	if (FTraceAmb(pamb))
+		TraceSoundEvent("REMOVE", pamb, nullptr, nullptr);
 	if (pamb == s_pambVagAmbient)
 	{
 		s_pambVagAmbient = nullptr;
@@ -4031,6 +4140,8 @@ void StopSound(AMB* pamb, int msRampdown)
 {
 	if (pamb == nullptr)
 		return;
+	if (FTraceAmb(pamb))
+		TraceSoundEvent("STOP", pamb, nullptr, nullptr);
 	if (pamb == s_pambVagAmbient || static_cast<int>(pamb->sfxid) == -2)
 	{
 		s_pambVagAmbient = nullptr;
@@ -6592,6 +6703,8 @@ void UpdateSounds()
 			// not outlive the ALO that created it.
 			if (amb.palo != nullptr && !FIsLoInWorld(reinterpret_cast<LO*>(amb.palo)))
 			{
+				if (FTraceAmb(&amb))
+					TraceSoundEvent("LEFT_WORLD", &amb, nullptr, nullptr);
 				completed.push_back(&amb);
 				continue;
 			}

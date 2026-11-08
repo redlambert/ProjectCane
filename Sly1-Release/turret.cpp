@@ -365,7 +365,10 @@ void HandleTurretMessage(TURRET* pturret, MSGID msgid, void* pv)
     if (pmsg->pasega == pturret->psmaTurret->pasegaCur)
     {
         if (pmsg->oidLabel == 859)
+        {
+            TraceSoundEvent("TURRET_FIRE", nullptr, pturret, nullptr);
             FFireRwm(pturret->prwm, 1);
+        }
 
         return;
     }
