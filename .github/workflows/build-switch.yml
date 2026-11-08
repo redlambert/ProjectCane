@@ -73,4 +73,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ProjectCane-switch
-          path: build/ProjectCane.nro
+          path: |
+            build/ProjectCane.nro
+            build/ProjectCane.elf
