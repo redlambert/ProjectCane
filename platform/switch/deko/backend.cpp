@@ -1312,6 +1312,28 @@ void APIENTRY DrawArrays(GLenum mode,GLint first,GLsizei count)
     if (!count) return;
     PrepareDraw();dkCmdBufDraw(Commands(),Primitive(mode),count,1,first,0);
 }
+// A draw whose index range runs past its buffer used to end the game with
+// "Index range exceeds its buffer". A desktop GL driver just drops or clips a
+// draw like that, so skip it instead and record it in deko_warnings.log, which
+// keeps one bad object from crashing the whole game.
+void LogSkippedIndexedDraw(GLenum mode,GLsizei count,unsigned bytes,uintptr_t offset,uint64_t bufferSize,bool hasBuffer,void* caller)
+{
+    static unsigned logged = 0;
+    static FILE* log = nullptr;
+    if (logged >= 64) return;
+    if (!log) log = std::fopen("sdmc:/switch/ProjectCane/deko_warnings.log","w");
+    if (!log) return;
+    ++logged;
+    std::fprintf(log,
+        "skipped indexed draw: mode=%u count=%d indexBytes=%u offset=%llu bufferSize=%llu hasBuffer=%d caller=%p drawIndexed=%p\n",
+        unsigned(mode),int(count),bytes,
+        static_cast<unsigned long long>(offset),
+        static_cast<unsigned long long>(bufferSize),
+        hasBuffer ? 1 : 0,
+        caller,
+        reinterpret_cast<void*>(&LogSkippedIndexedDraw));
+    std::fflush(log);
+}
 void DrawIndexed(GLenum mode,GLsizei count,GLenum type,const void* indices,GLsizei instances,GLint vertexOffset,GLuint firstInstance)
 {
     if (count<0 || instances<0) Fail("Invalid indexed draw range");
@@ -1320,7 +1342,11 @@ void DrawIndexed(GLenum mode,GLsizei count,GLenum type,const void* indices,GLsiz
     const auto extent=ResolveBuffer(arrays.at(vertexArray).indices);
     const auto offset=reinterpret_cast<uintptr_t>(indices);
     const unsigned bytes=ComponentBytes(type);
-    if (!extent.addr || offset%bytes || offset+uint64_t(count)*bytes>extent.size) Fail("Index range exceeds its buffer");
+    if (!extent.addr || offset%bytes || offset+uint64_t(count)*bytes>extent.size)
+    {
+        LogSkippedIndexedDraw(mode,count,bytes,offset,extent.size,extent.addr != 0,__builtin_return_address(0));
+        return;
+    }
     if (type!=GL_UNSIGNED_BYTE && type!=GL_UNSIGNED_SHORT && type!=GL_UNSIGNED_INT) Fail("Invalid index format");
     if (boundIndexAddress != extent.addr || boundIndexType != type)
     {

@@ -174,14 +174,6 @@ void HandleAsegaEvent(ASEGA* pasega, EA* pea, int* pfRetracted)
                     psw, 260, static_cast<OID>(peasnd->oid), paloSearchRoot));
             }
 
-            {
-                char note[96];
-                std::snprintf(note, sizeof(note), "aseg_sound sfx=%d cont=%d paloSound=%s eventOid=%d",
-                    static_cast<int>(sfxid), fContinuous ? 1 : 0,
-                    paloSound ? "found" : "none", static_cast<int>(peasnd->oid));
-                TraceSoundEvent("ASEG_SOUND", nullptr, pasega->paloRoot, note);
-            }
-
             AMB** ppamb = fContinuous ? &pasega->pambContinuous : nullptr;
             if (!paloSound)
                 StartSound(sfxid, ppamb, nullptr, nullptr, 3000.0f, 300.0f, 1.0f, 0.0f, 0.0f, nullptr, nullptr);

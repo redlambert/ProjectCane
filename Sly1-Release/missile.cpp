@@ -60,22 +60,11 @@ void OnMissileRemove(MISSILE* pmissile)
 {
 	OnSoRemove(pmissile);
 
-	if (pmissile->pasegaCur != nullptr)
+	if (pmissile->pasegaCur != nullptr) 
 	{
-		// The fire ASEG starts the missile's looping flight sound as the
-		// ASEGA's continuous AMB. RetractAsega only drops that handle, which
-		// leaves the loop playing with no owner after the missile detonates.
-		// Every later shot then stacks another endless loop on top of it.
-		if (pmissile->pasegaCur->pambContinuous != nullptr)
-			StopSound(pmissile->pasegaCur->pambContinuous, 0);
-
 		RetractAsega(pmissile->pasegaCur);
 		pmissile->pasegaCur = nullptr;
 	}
-
-	// Same for an ALO-level looping sound attached directly to the missile.
-	if (pmissile->psfx != nullptr && pmissile->psfx->pamb != nullptr)
-		StopSound(pmissile->psfx->pamb, 0);
 }
 
 void LoadMissileFromBrx(MISSILE* pmissile, CBinaryInputStream* pbis)
@@ -127,8 +116,6 @@ void ProjectMissileTransform(MISSILE* pmissile, float dt, int fParentDirty)
 
 void FireMissile(MISSILE* pmissile, ALO* paloTarget, glm::vec3* pposTargetLocal)
 {
-	TraceSoundEvent("MISSILE_FIRE", nullptr, pmissile, nullptr);
-
 	pmissile->paloTarget = paloTarget;
 	pmissile->posTargetLocal = *pposTargetLocal;
 

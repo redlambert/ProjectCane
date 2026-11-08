@@ -450,8 +450,6 @@ AMB* PambAlloc();
 void DropPamb(AMB** ppamb);
 void RemoveAmb(AMB* pamb);
 void StopSound(AMB* pamb, int msRampdown);
-// Temporary diagnostic: appends one line to sound_trace.log.
-void TraceSoundEvent(const char* event, const AMB* pamb, const class LO* ploContext, const char* note);
 void PausePamb(AMB* pamb);
 void ContinuePamb(AMB* pamb);
 void SetAMRegister(int ireg, byte bVal);
