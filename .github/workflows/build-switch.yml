@@ -19,17 +19,37 @@ jobs:
           apt-get update
           apt-get install -y --no-install-recommends cmake ninja-build python3 make
 
-      - name: Install Switch libraries
+      # devkitPro's package server blocks GitHub build machines, so packages
+      # cannot be downloaded here. The devkita64 image already ships with the
+      # Switch libraries; this step just reports anything that is missing.
+      - name: Check Switch libraries
         run: |
-          dkp-pacman -Sy --noconfirm --needed \
-            deko3d \
-            uam \
-            switch-ffmpeg \
-            switch-dav1d \
-            switch-libexpat \
-            switch-libzstd \
-            switch-zlib \
-            switch-bzip2
+          MISSING=""
+          for FILE in \
+            "$DEVKITPRO/libnx/lib/libdeko3d.a" \
+            "$DEVKITPRO/tools/bin/uam" \
+            "$DEVKITPRO/tools/bin/elf2nro" \
+            "$DEVKITPRO/tools/bin/nacptool" \
+            "$DEVKITPRO/portlibs/switch/lib/libavformat.a" \
+            "$DEVKITPRO/portlibs/switch/lib/libavcodec.a" \
+            "$DEVKITPRO/portlibs/switch/lib/libswscale.a" \
+            "$DEVKITPRO/portlibs/switch/lib/libswresample.a" \
+            "$DEVKITPRO/portlibs/switch/lib/libavutil.a" \
+            "$DEVKITPRO/portlibs/switch/lib/libdav1d.a" \
+            "$DEVKITPRO/portlibs/switch/lib/libexpat.a" \
+            "$DEVKITPRO/portlibs/switch/lib/libzstd.a" \
+            "$DEVKITPRO/portlibs/switch/lib/libz.a" \
+            "$DEVKITPRO/portlibs/switch/lib/libbz2.a"
+          do
+            if [ ! -e "$FILE" ]; then
+              echo "MISSING: $FILE"
+              MISSING="yes"
+            fi
+          done
+          if [ -n "$MISSING" ]; then
+            exit 1
+          fi
+          echo "All Switch libraries found"
 
       - name: Provide libelf placeholder if missing
         # The Switch build script requires libelf.a, but no game code uses it
